@@ -3,7 +3,7 @@ import { AuthProvider } from './contexts/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import Layout from './components/layout/Layout';
 import Login from './pages/auth/Login';
-import AdminDashboard from './pages/dashboard/AdminDashboard';
+import DashboardRouter from './components/dashboard/DashboardRouter';
 
 function App() {
   return (
@@ -20,7 +20,7 @@ function App() {
             </ProtectedRoute>
           }>
             <Route index element={<Navigate to="/dashboard" replace />} />
-            <Route path="dashboard" element={<AdminDashboard />} />
+            <Route path="dashboard" element={<DashboardRouter />} />
             
             {/* Admin Routes */}
             <Route path="students" element={

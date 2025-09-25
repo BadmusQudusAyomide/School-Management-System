@@ -7,10 +7,10 @@ const Layout: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
-    <div className="flex h-screen bg-black">
+    <div className="flex h-screen bg-black overflow-hidden">
       {/* Sidebar */}
       <div className={`${sidebarOpen ? 'block' : 'hidden'} lg:block fixed lg:relative z-30 h-full transition-all duration-300 ease-out`}>
-        <div className={`${sidebarOpen ? 'translate-x-0 opacity-100' : '-translate-x-full opacity-0'} lg:translate-x-0 lg:opacity-100 transform transition-all duration-300 ease-out`}>
+        <div className={`${sidebarOpen ? 'translate-x-0 opacity-100' : '-translate-x-full opacity-0'} lg:translate-x-0 lg:opacity-100 transform transition-all duration-300 ease-out h-full`}>
           <Sidebar />
         </div>
       </div>
@@ -29,7 +29,7 @@ const Layout: React.FC = () => {
       )}
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex-1 flex flex-col min-w-0">
         <Header 
           title="Dashboard" 
           onMenuClick={() => setSidebarOpen(!sidebarOpen)} 

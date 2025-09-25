@@ -108,7 +108,7 @@ const Sidebar: React.FC = () => {
   );
 
   return (
-    <div className="w-64 h-screen bg-white/5 backdrop-blur-lg border-r border-white/20 flex flex-col shadow-2xl">
+    <div className="w-64 h-full bg-white/5 backdrop-blur-lg border-r border-white/20 flex flex-col shadow-2xl overflow-hidden">
       {/* Logo */}
       <div className="p-6 border-b border-white/10">
         <div className="flex items-center space-x-3">
@@ -123,7 +123,7 @@ const Sidebar: React.FC = () => {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 px-4 py-6 space-y-2">
+      <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent">
         {filteredMenuItems.map((item) => (
           <NavLink
             key={item.path}
@@ -143,7 +143,7 @@ const Sidebar: React.FC = () => {
       </nav>
 
       {/* User Profile & Logout */}
-      <div className="p-4 border-t border-white/10">
+      <div className="p-4 border-t border-white/10 flex-shrink-0">
         <div className="flex items-center space-x-3 mb-4">
           <img
             src={user?.avatar || 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150'}

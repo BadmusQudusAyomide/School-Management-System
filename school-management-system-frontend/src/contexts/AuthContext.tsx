@@ -51,7 +51,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         {
           id: '1',
           email: 'admin@school.com',
-          firstName: 'John',
+          firstName: 'Qudus',
           lastName: 'Admin',
           role: 'admin',
           avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150',
@@ -79,8 +79,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         {
           id: '3',
           email: 'student@school.com',
-          firstName: 'Mike',
-          lastName: 'Johnson',
+          firstName: 'Qudus',
+          lastName: 'Ayomide',
           role: 'student',
           avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150',
           phone: '+1234567892',
@@ -93,8 +93,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         {
           id: '4',
           email: 'parent@school.com',
-          firstName: 'Sarah',
-          lastName: 'Johnson',
+          firstName: 'Badmus',
+          lastName: 'Adufe',
           role: 'parent',
           avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150',
           phone: '+1234567893',
@@ -113,6 +113,21 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           avatar: 'https://images.unsplash.com/photo-1560250097-0b93528c311a?w=150',
           phone: '+1234567894',
           address: '321 Finance St',
+          schoolId: 'school-1',
+          isActive: true,
+          createdAt: '2024-01-01T00:00:00Z',
+          updatedAt: '2024-01-01T00:00:00Z'
+        },
+        // Additional students for parent relationships
+        {
+          id: '6',
+          email: 'student2@school.com',
+          firstName: 'Fatima',
+          lastName: 'Ayomide',
+          role: 'student',
+          avatar: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150',
+          phone: '+1234567895',
+          address: '789 Student Rd',
           schoolId: 'school-1',
           isActive: true,
           createdAt: '2024-01-01T00:00:00Z',
