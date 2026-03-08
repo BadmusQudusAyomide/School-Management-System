@@ -1,6 +1,7 @@
 import Student from "../models/Student.js";
 import User from "../models/User.js";
 import { badRequest, notFound } from "../utils/errors.js";
+import { generateAdmissionNumber } from "./admissionNumberService.js";
 
 const getScopedStudentUserIds = async (schoolId) => {
   const users = await User.find({ schoolId, role: "student" }).select("_id");
@@ -42,7 +43,10 @@ export const getStudentById = async (id, currentUser) => {
 
 export const createStudent = async (payload, currentUser) => {
   await ensureStudentUser(payload.userId, currentUser.schoolId);
-  return Student.create(payload);
+  return Student.create({
+    ...payload,
+    admissionNumber: await generateAdmissionNumber(currentUser.schoolId),
+  });
 };
 
 export const updateStudent = async (id, payload, currentUser) => {
@@ -54,7 +58,6 @@ export const updateStudent = async (id, payload, currentUser) => {
 
   const fields = [
     "userId",
-    "admissionNumber",
     "class",
     "section",
     "dateOfBirth",

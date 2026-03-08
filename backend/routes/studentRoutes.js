@@ -25,7 +25,6 @@ router.post(
   authorizeRoles("admin"),
   [
     body("userId").isMongoId().withMessage("Valid userId is required"),
-    body("admissionNumber").trim().notEmpty().withMessage("Admission number is required"),
     body("class").isMongoId().withMessage("Valid class id is required"),
     body("section").trim().notEmpty().withMessage("Section is required"),
     body("dateOfBirth").isISO8601().withMessage("Valid dateOfBirth is required"),

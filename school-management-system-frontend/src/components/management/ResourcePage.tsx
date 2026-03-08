@@ -10,7 +10,7 @@ export interface ResourceFieldOption {
 export interface ResourceFieldConfig {
   name: string;
   label: string;
-  type?: 'text' | 'number' | 'date' | 'textarea' | 'select';
+  type?: 'text' | 'number' | 'date' | 'textarea' | 'select' | 'multiselect';
   required?: boolean;
   placeholder?: string;
   options?: ResourceFieldOption[];
@@ -226,6 +226,25 @@ const ResourcePage = <TItem,>({
                       className="input-glassmorphism w-full"
                     >
                       <option value="">Select {field.label}</option>
+                      {(field.options ?? []).map((option) => (
+                        <option key={option.value} value={option.value} className="bg-gray-900">
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  ) : field.type === 'multiselect' ? (
+                    <select
+                      multiple
+                      value={(formValues[field.name] ?? '').split(',').filter(Boolean)}
+                      onChange={(event) =>
+                        setFormValues((current) => ({
+                          ...current,
+                          [field.name]: Array.from(event.target.selectedOptions).map((option) => option.value).join(','),
+                        }))
+                      }
+                      required={field.required}
+                      className="input-glassmorphism w-full min-h-36"
+                    >
                       {(field.options ?? []).map((option) => (
                         <option key={option.value} value={option.value} className="bg-gray-900">
                           {option.label}

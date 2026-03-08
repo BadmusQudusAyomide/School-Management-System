@@ -1,6 +1,7 @@
 import Teacher from "../models/Teacher.js";
 import User from "../models/User.js";
 import { badRequest, notFound } from "../utils/errors.js";
+import { generateEmployeeId } from "./admissionNumberService.js";
 
 const getScopedTeacherUserIds = async (schoolId) => {
   const users = await User.find({ schoolId, role: "teacher" }).select("_id");
@@ -24,7 +25,10 @@ export const getTeachers = async (currentUser) => {
 
 export const createTeacher = async (payload, currentUser) => {
   await ensureTeacherUser(payload.userId, currentUser.schoolId);
-  return Teacher.create(payload);
+  return Teacher.create({
+    ...payload,
+    employeeId: await generateEmployeeId(currentUser.schoolId),
+  });
 };
 
 export const updateTeacher = async (id, payload, currentUser) => {
@@ -38,7 +42,7 @@ export const updateTeacher = async (id, payload, currentUser) => {
     await ensureTeacherUser(payload.userId, currentUser.schoolId);
   }
 
-  const fields = ["userId", "employeeId", "subjects", "classes", "qualification", "salary"];
+  const fields = ["userId", "subjects", "classes", "qualification", "salary"];
   for (const field of fields) {
     if (payload[field] !== undefined) {
       teacher[field] = payload[field];

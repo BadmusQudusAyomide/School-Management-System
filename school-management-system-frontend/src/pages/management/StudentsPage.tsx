@@ -40,7 +40,7 @@ interface StudentRecord {
 const StudentsPage: React.FC = () => {
   const { user } = useAuth();
   const canWrite = user?.role === 'admin';
-  const [loading, setLoading] = useState(canWrite);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [studentUsers, setStudentUsers] = useState<UserRecord[]>([]);
   const [parentUsers, setParentUsers] = useState<UserRecord[]>([]);
@@ -76,138 +76,175 @@ const StudentsPage: React.FC = () => {
   }, [canWrite]);
 
   if (loading) {
-    return <DashboardState title="Loading students" message="Preparing student management tools..." />;
-  }
-
-  if (error) {
-    return <DashboardState title="Students unavailable" message={error} />;
+    return (
+      <div className="space-y-4">
+        {error ? <DashboardState title="Student references unavailable" message={error} /> : null}
+        <ResourcePage<StudentRecord>
+          title="Students Management"
+          description="Create, update, and review student enrollment records. Admission numbers are generated automatically in sequence."
+          endpoint="/students"
+          canWrite={canWrite}
+          readOnlyMessage="Teachers can review student records here, but only administrators can create, edit, or delete them."
+          getId={(item) => getEntityId(item)}
+          columns={[
+            {
+              key: 'student',
+              label: 'Student',
+              render: (item) => (
+                <div>
+                  <p className="font-medium">{item.userId?.name ?? 'Unknown student'}</p>
+                  <p className="text-xs text-white/60">{item.userId?.email ?? 'No email'}</p>
+                </div>
+              ),
+            },
+            {
+              key: 'admissionNumber',
+              label: 'Admission No.',
+              render: (item) => item.admissionNumber ?? 'N/A',
+            },
+            {
+              key: 'class',
+              label: 'Class',
+              render: (item) => `${item.class?.name ?? 'N/A'} ${item.section ?? item.class?.section ?? ''}`.trim(),
+            },
+            {
+              key: 'gender',
+              label: 'Gender',
+              render: (item) => item.gender ?? 'N/A',
+            },
+            {
+              key: 'feesStatus',
+              label: 'Fees',
+              render: (item) => item.feesStatus ?? 'pending',
+            },
+          ]}
+          fields={[]}
+        />
+      </div>
+    );
   }
 
   return (
-    <ResourcePage<StudentRecord>
-      title="Students Management"
-      description="Create, update, and review student enrollment records."
-      endpoint="/students"
-      canWrite={canWrite}
-      readOnlyMessage="Teachers can review student records here, but only administrators can create, edit, or delete them."
-      getId={(item) => getEntityId(item)}
-      columns={[
-        {
-          key: 'student',
-          label: 'Student',
-          render: (item) => (
-            <div>
-              <p className="font-medium">{item.userId?.name ?? 'Unknown student'}</p>
-              <p className="text-xs text-white/60">{item.userId?.email ?? 'No email'}</p>
-            </div>
-          ),
-        },
-        {
-          key: 'admissionNumber',
-          label: 'Admission No.',
-          render: (item) => item.admissionNumber ?? 'N/A',
-        },
-        {
-          key: 'class',
-          label: 'Class',
-          render: (item) => `${item.class?.name ?? 'N/A'} ${item.section ?? item.class?.section ?? ''}`.trim(),
-        },
-        {
-          key: 'gender',
-          label: 'Gender',
-          render: (item) => item.gender ?? 'N/A',
-        },
-        {
-          key: 'feesStatus',
-          label: 'Fees',
-          render: (item) => item.feesStatus ?? 'pending',
-        },
-      ]}
-      fields={[
-        {
-          name: 'userId',
-          label: 'Student User',
-          type: 'select',
-          required: true,
-          options: buildOptions(studentUsers, (item) => getEntityId(item), (item) => `${item.name ?? 'Unknown'} (${item.email ?? 'No email'})`),
-        },
-        {
-          name: 'admissionNumber',
-          label: 'Admission Number',
-          required: true,
-          placeholder: 'ADM-2026-001',
-        },
-        {
-          name: 'class',
-          label: 'Class',
-          type: 'select',
-          required: true,
-          options: buildOptions(classes, (item) => getEntityId(item), (item) => `${item.name ?? 'Class'} ${item.section ?? ''}`.trim()),
-        },
-        {
-          name: 'section',
-          label: 'Section',
-          required: true,
-          placeholder: 'A',
-        },
-        {
-          name: 'dateOfBirth',
-          label: 'Date of Birth',
-          type: 'date',
-          required: true,
-        },
-        {
-          name: 'gender',
-          label: 'Gender',
-          type: 'select',
-          required: true,
-          options: [
-            { value: 'male', label: 'Male' },
-            { value: 'female', label: 'Female' },
-            { value: 'other', label: 'Other' },
-          ],
-        },
-        {
-          name: 'parentId',
-          label: 'Parent User',
-          type: 'select',
-          required: true,
-          options: buildOptions(parentUsers, (item) => getEntityId(item), (item) => `${item.name ?? 'Unknown'} (${item.email ?? 'No email'})`),
-        },
-        {
-          name: 'address',
-          label: 'Address',
-          type: 'textarea',
-          required: true,
-          placeholder: 'Student address',
-        },
-        {
-          name: 'feesStatus',
-          label: 'Fees Status',
-          type: 'select',
-          options: [
-            { value: 'paid', label: 'Paid' },
-            { value: 'pending', label: 'Pending' },
-            { value: 'partial', label: 'Partial' },
-            { value: 'overdue', label: 'Overdue' },
-          ],
-        },
-      ]}
-      toFormValues={(item) => ({
-        userId: getEntityId(item.userId),
-        admissionNumber: item.admissionNumber ?? '',
-        class: getEntityId(item.class),
-        section: item.section ?? '',
-        dateOfBirth: formatDateForInput(item.dateOfBirth),
-        gender: item.gender ?? '',
-        parentId:
-          typeof item.parentId?.userId === 'string'
-            ? item.parentId.userId
-            : getEntityId(item.parentId?.userId as UserRecord | undefined),
-        address: item.address ?? '',
-        feesStatus: item.feesStatus ?? 'pending',
-      })}
-    />
+    <div className="space-y-4">
+      {error ? <DashboardState title="Student references unavailable" message={error} /> : null}
+      <ResourcePage<StudentRecord>
+        title="Students Management"
+        description="Create, update, and review student enrollment records. Admission numbers are generated automatically in sequence."
+        endpoint="/students"
+        canWrite={canWrite}
+        readOnlyMessage="Teachers can review student records here, but only administrators can create, edit, or delete them."
+        getId={(item) => getEntityId(item)}
+        columns={[
+          {
+            key: 'student',
+            label: 'Student',
+            render: (item) => (
+              <div>
+                <p className="font-medium">{item.userId?.name ?? 'Unknown student'}</p>
+                <p className="text-xs text-white/60">{item.userId?.email ?? 'No email'}</p>
+              </div>
+            ),
+          },
+          {
+            key: 'admissionNumber',
+            label: 'Admission No.',
+            render: (item) => item.admissionNumber ?? 'N/A',
+          },
+          {
+            key: 'class',
+            label: 'Class',
+            render: (item) => `${item.class?.name ?? 'N/A'} ${item.section ?? item.class?.section ?? ''}`.trim(),
+          },
+          {
+            key: 'gender',
+            label: 'Gender',
+            render: (item) => item.gender ?? 'N/A',
+          },
+          {
+            key: 'feesStatus',
+            label: 'Fees',
+            render: (item) => item.feesStatus ?? 'pending',
+          },
+        ]}
+        fields={[
+          {
+            name: 'userId',
+            label: 'Student User',
+            type: 'select',
+            required: true,
+            options: buildOptions(studentUsers, (item) => getEntityId(item), (item) => `${item.name ?? 'Unknown'} (${item.email ?? 'No email'})`),
+          },
+          {
+            name: 'class',
+            label: 'Class',
+            type: 'select',
+            required: true,
+            options: buildOptions(classes, (item) => getEntityId(item), (item) => `${item.name ?? 'Class'} ${item.section ?? ''}`.trim()),
+          },
+          {
+            name: 'section',
+            label: 'Section',
+            required: true,
+            placeholder: 'A',
+          },
+          {
+            name: 'dateOfBirth',
+            label: 'Date of Birth',
+            type: 'date',
+            required: true,
+          },
+          {
+            name: 'gender',
+            label: 'Gender',
+            type: 'select',
+            required: true,
+            options: [
+              { value: 'male', label: 'Male' },
+              { value: 'female', label: 'Female' },
+              { value: 'other', label: 'Other' },
+            ],
+          },
+          {
+            name: 'parentId',
+            label: 'Parent User',
+            type: 'select',
+            required: true,
+            options: buildOptions(parentUsers, (item) => getEntityId(item), (item) => `${item.name ?? 'Unknown'} (${item.email ?? 'No email'})`),
+          },
+          {
+            name: 'address',
+            label: 'Address',
+            type: 'textarea',
+            required: true,
+            placeholder: 'Student address',
+          },
+          {
+            name: 'feesStatus',
+            label: 'Fees Status',
+            type: 'select',
+            options: [
+              { value: 'paid', label: 'Paid' },
+              { value: 'pending', label: 'Pending' },
+              { value: 'partial', label: 'Partial' },
+              { value: 'overdue', label: 'Overdue' },
+            ],
+          },
+        ]}
+        toFormValues={(item) => ({
+          userId: getEntityId(item.userId),
+          class: getEntityId(item.class),
+          section: item.section ?? '',
+          dateOfBirth: formatDateForInput(item.dateOfBirth),
+          gender: item.gender ?? '',
+          parentId:
+            typeof item.parentId?.userId === 'string'
+              ? item.parentId.userId
+              : getEntityId(item.parentId?.userId as UserRecord | undefined),
+          address: item.address ?? '',
+          feesStatus: item.feesStatus ?? 'pending',
+        })}
+      />
+    </div>
   );
 };
 

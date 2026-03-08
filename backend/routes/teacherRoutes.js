@@ -16,7 +16,6 @@ router.post(
   authorizeRoles("admin"),
   [
     body("userId").isMongoId().withMessage("Valid userId is required"),
-    body("employeeId").trim().notEmpty().withMessage("Employee id is required"),
     body("qualification").trim().notEmpty().withMessage("Qualification is required"),
     body("salary").isNumeric().withMessage("Salary must be numeric"),
   ],

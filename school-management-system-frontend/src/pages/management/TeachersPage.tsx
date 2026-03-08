@@ -69,7 +69,7 @@ const TeachersPage: React.FC = () => {
   return (
     <ResourcePage<TeacherRecord>
       title="Teachers Management"
-      description="Maintain teacher profiles, assignments, and payroll metadata."
+      description="Maintain teacher profiles, subjects, assigned classes, and payroll metadata. Employee IDs are generated automatically."
       endpoint="/teachers"
       getId={(item) => getEntityId(item)}
       columns={[
@@ -113,12 +113,6 @@ const TeachersPage: React.FC = () => {
           options: buildOptions(teacherUsers, (item) => getEntityId(item), (item) => `${item.name ?? 'Unknown'} (${item.email ?? 'No email'})`),
         },
         {
-          name: 'employeeId',
-          label: 'Employee ID',
-          required: true,
-          placeholder: 'EMP-001',
-        },
-        {
           name: 'subjects',
           label: 'Subjects',
           type: 'textarea',
@@ -126,9 +120,9 @@ const TeachersPage: React.FC = () => {
         },
         {
           name: 'classes',
-          label: 'Assigned Class IDs',
-          type: 'textarea',
-          placeholder: classes.map((item) => `${item.name} ${item.section ?? ''} (${getEntityId(item)})`).join(', '),
+          label: 'Assigned Classes',
+          type: 'multiselect',
+          options: buildOptions(classes, (item) => getEntityId(item), (item) => `${item.name ?? 'Class'} ${item.section ?? ''}`.trim()),
         },
         {
           name: 'qualification',
@@ -146,9 +140,8 @@ const TeachersPage: React.FC = () => {
       ]}
       toFormValues={(item) => ({
         userId: getEntityId(item.userId),
-        employeeId: item.employeeId ?? '',
         subjects: joinCommaSeparated(item.subjects),
-        classes: joinCommaSeparated(item.classes?.map((classItem) => getEntityId(classItem))),
+        classes: (item.classes?.map((classItem) => getEntityId(classItem)) ?? []).join(','),
         qualification: item.qualification ?? '',
         salary: item.salary !== undefined ? String(item.salary) : '',
       })}
