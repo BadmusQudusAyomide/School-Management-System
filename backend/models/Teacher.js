@@ -7,7 +7,6 @@ const teacherSchema = new mongoose.Schema(
       ref: "User",
       required: true,
       unique: true,
-      index: true,
     },
     employeeId: {
       type: String,
@@ -41,8 +40,6 @@ const teacherSchema = new mongoose.Schema(
     timestamps: true,
   }
 );
-
-teacherSchema.index({ employeeId: 1 });
 
 const Teacher = mongoose.model("Teacher", teacherSchema);
 

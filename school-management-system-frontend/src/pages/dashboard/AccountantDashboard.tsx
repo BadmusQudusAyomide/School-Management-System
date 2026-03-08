@@ -1,231 +1,212 @@
-import React from 'react';
-import { DollarSign, TrendingUp, CreditCard, AlertCircle, FileText } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { BarChart, Bar, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { DollarSign, TrendingUp, CreditCard, FileText } from 'lucide-react';
 import StatCard from '../../components/dashboard/StatCard';
-import { useAuth } from '../../contexts/AuthContext';
+import DashboardState from '../../components/dashboard/DashboardState';
+import { api } from '../../lib/api';
+
+const getId = (value: { id?: string; _id?: string } | null | undefined) => value?._id ?? value?.id ?? '';
 
 const AccountantDashboard: React.FC = () => {
-  const { user } = useAuth();
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [saving, setSaving] = useState('');
+  const [stats, setStats] = useState({ totalRevenue: 0, outstandingFees: 0, collectionRate: 0, reportCount: 0 });
+  const [fees, setFees] = useState<any[]>([]);
+  const [students, setStudents] = useState<any[]>([]);
+  const [reports, setReports] = useState<any[]>([]);
+  const [revenueData, setRevenueData] = useState<Array<{ name: string; revenue: number }>>([]);
+  const [feeForm, setFeeForm] = useState({ student: '', amount: '', paid: '', status: 'pending', dueDate: '' });
+  const [reportForm, setReportForm] = useState({ title: '', type: 'finance', period: '', summary: '' });
 
-  // Mock data - replace with actual API calls
-  const stats = {
-    totalRevenue: 125600,
-    outstandingFees: 45600,
-    collectionRate: 73.2,
-    overduePayments: 28
+  const loadDashboard = async () => {
+    setLoading(true);
+    setError('');
+
+    try {
+      const [feesRes, studentsRes, reportsRes] = await Promise.all([
+        api.get('/fees'),
+        api.get('/students'),
+        api.get('/reports'),
+      ]);
+
+      const feeRecords = feesRes.data.data ?? [];
+      const studentRecords = studentsRes.data.data ?? [];
+      const reportRecords = reportsRes.data.data ?? [];
+
+      const totalRevenue = feeRecords.reduce((sum: number, item: { paid?: number }) => sum + (item.paid ?? 0), 0);
+      const outstandingFees = feeRecords.reduce((sum: number, item: { amount?: number; paid?: number }) => sum + Math.max((item.amount ?? 0) - (item.paid ?? 0), 0), 0);
+      const totalBilled = feeRecords.reduce((sum: number, item: { amount?: number }) => sum + (item.amount ?? 0), 0);
+
+      const groupedRevenue = new Map<string, number>();
+      feeRecords.forEach((item: { dueDate?: string; paid?: number }) => {
+        const date = item.dueDate ? new Date(item.dueDate) : new Date();
+        const key = date.toLocaleDateString('en-US', { month: 'short' });
+        groupedRevenue.set(key, (groupedRevenue.get(key) ?? 0) + (item.paid ?? 0));
+      });
+
+      setStats({
+        totalRevenue,
+        outstandingFees,
+        collectionRate: totalBilled ? (totalRevenue / totalBilled) * 100 : 0,
+        reportCount: reportRecords.length,
+      });
+      setFees(feeRecords);
+      setStudents(studentRecords);
+      setReports(reportRecords);
+      setRevenueData(Array.from(groupedRevenue.entries()).map(([name, revenue]) => ({ name, revenue })));
+      if (studentRecords[0]) {
+        setFeeForm((current) => ({ ...current, student: getId(studentRecords[0]) }));
+      }
+    } catch (fetchError) {
+      console.error(fetchError);
+      setError('Failed to load accountant dashboard data.');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const recentTransactions = [
-    { id: 1, student: 'Qudus Ayomide', type: 'Tuition Fee', amount: 800, status: 'completed', date: '2024-01-15' },
-    { id: 2, student: 'Fatima Badmus', type: 'Transport Fee', amount: 200, status: 'completed', date: '2024-01-15' },
-    { id: 3, student: 'Ahmed Hassan', type: 'Library Fee', amount: 100, status: 'pending', date: '2024-01-14' },
-    { id: 4, student: 'Sarah Johnson', type: 'Lab Fee', amount: 150, status: 'completed', date: '2024-01-14' }
-  ];
+  useEffect(() => {
+    void loadDashboard();
+  }, []);
 
-  const pendingPayments = [
-    { id: 1, student: 'John Smith', class: 'Grade 10-A', amount: 1200, dueDate: '2024-01-20', daysOverdue: 5 },
-    { id: 2, student: 'Emma Wilson', class: 'Grade 9-B', amount: 800, dueDate: '2024-01-18', daysOverdue: 7 },
-    { id: 3, student: 'Michael Brown', class: 'Grade 11-A', amount: 1500, dueDate: '2024-01-15', daysOverdue: 10 },
-    { id: 4, student: 'Lisa Davis', class: 'Grade 8-C', amount: 600, dueDate: '2024-01-22', daysOverdue: 3 }
-  ];
+  const submitFee = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setSaving('fee');
+    try {
+      await api.post('/fees', {
+        ...feeForm,
+        amount: Number(feeForm.amount),
+        paid: Number(feeForm.paid),
+      });
+      setFeeForm((current) => ({ ...current, amount: '', paid: '', dueDate: '' }));
+      await loadDashboard();
+    } catch (submitError) {
+      console.error(submitError);
+      setError('Failed to create fee record.');
+    } finally {
+      setSaving('');
+    }
+  };
 
-  const monthlyCollection = [
-    { month: 'Jan', collected: 45600, target: 60000 },
-    { month: 'Dec', collected: 52000, target: 60000 },
-    { month: 'Nov', collected: 48000, target: 55000 },
-    { month: 'Oct', collected: 51000, target: 55000 }
-  ];
+  const submitReport = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setSaving('report');
+    try {
+      await api.post('/reports', reportForm);
+      setReportForm({ title: '', type: 'finance', period: '', summary: '' });
+      await loadDashboard();
+    } catch (submitError) {
+      console.error(submitError);
+      setError('Failed to create financial report.');
+    } finally {
+      setSaving('');
+    }
+  };
 
-  const feeCategories = [
-    { category: 'Tuition Fee', collected: 85600, pending: 25400, total: 111000 },
-    { category: 'Transport Fee', collected: 18200, pending: 8800, total: 27000 },
-    { category: 'Library Fee', collected: 12400, pending: 3600, total: 16000 },
-    { category: 'Lab Fee', collected: 9400, pending: 7800, total: 17200 }
-  ];
+  if (loading) {
+    return <DashboardState title="Loading dashboard" message="Preparing fee, payment, and report data..." />;
+  }
 
-  const quickActions = [
-    { icon: DollarSign, label: 'Record Payment', path: '/payments/add', color: 'blue' as const },
-    { icon: FileText, label: 'Generate Report', path: '/reports', color: 'green' as const },
-    { icon: AlertCircle, label: 'Send Reminders', path: '/reminders', color: 'yellow' as const },
-    { icon: CreditCard, label: 'Fee Structure', path: '/fees/structure', color: 'purple' as const }
-  ];
+  if (error && !fees.length && !reports.length) {
+    return <DashboardState title="Dashboard unavailable" message={error} actionLabel="Retry" onAction={() => void loadDashboard()} />;
+  }
 
   return (
     <div className="space-y-6">
-      {/* Welcome Section */}
       <div className="card-glassmorphism">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-white">Welcome back, {user?.firstName}!</h1>
-            <p className="text-gray-200 mt-1">Manage school finances and fee collections.</p>
-          </div>
-          <div className="text-right">
-            <p className="text-sm text-white/60">Today</p>
-            <p className="text-lg font-semibold text-white">
-              {new Date().toLocaleDateString('en-US', { 
-                weekday: 'long', 
-                year: 'numeric', 
-                month: 'long', 
-                day: 'numeric' 
-              })}
-            </p>
-          </div>
+        <h1 className="text-2xl font-bold text-white">Accountant Dashboard</h1>
+        <p className="text-white/70 mt-2">Manage school fees, track payments, and maintain financial reports.</p>
+      </div>
+
+      {error && <DashboardState title="Update warning" message={error} />}
+
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+        <StatCard title="Total Revenue" value={`$${stats.totalRevenue.toLocaleString()}`} icon={DollarSign} color="blue" />
+        <StatCard title="Outstanding Fees" value={`$${stats.outstandingFees.toLocaleString()}`} icon={CreditCard} color="yellow" />
+        <StatCard title="Collection Rate" value={`${stats.collectionRate.toFixed(1)}%`} icon={TrendingUp} color="green" />
+        <StatCard title="Reports" value={stats.reportCount} icon={FileText} color="purple" />
+      </div>
+
+      <div className="card-glassmorphism">
+        <h3 className="text-lg font-semibold text-white mb-4">Payment Analytics</h3>
+        <div className="h-72">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={revenueData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" />
+              <XAxis dataKey="name" stroke="#d1d5db" />
+              <YAxis stroke="#d1d5db" />
+              <Tooltip />
+              <Bar dataKey="revenue" fill="#34d399" radius={[8, 8, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
         </div>
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard
-          title="Total Revenue"
-          value={`$${stats.totalRevenue.toLocaleString()}`}
-          icon={DollarSign}
-          trend={{ value: 8.2, isPositive: true }}
-          color="blue"
-        />
-        <StatCard
-          title="Outstanding Fees"
-          value={`$${stats.outstandingFees.toLocaleString()}`}
-          icon={AlertCircle}
-          trend={{ value: -5.3, isPositive: true }}
-          color="yellow"
-        />
-        <StatCard
-          title="Collection Rate"
-          value={`${stats.collectionRate}%`}
-          icon={TrendingUp}
-          trend={{ value: 2.1, isPositive: true }}
-          color="green"
-        />
-        <StatCard
-          title="Overdue Payments"
-          value={stats.overduePayments}
-          icon={CreditCard}
-          trend={{ value: -12.5, isPositive: true }}
-          color="red"
-        />
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Quick Actions */}
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         <div className="card-glassmorphism">
-          <h3 className="text-lg font-semibold text-white mb-4">Quick Actions</h3>
-          <div className="grid grid-cols-2 gap-4">
-            {quickActions.map((action) => (
-              <button
-                key={action.label}
-                className="flex flex-col items-center gap-3 p-4 rounded-xl bg-white/5 backdrop-blur-md border border-white/10 hover:bg-white/10 hover:border-white/20 transition-all duration-200 group shadow-lg"
-              >
-                <div className="w-12 h-12 rounded-xl bg-white/15 backdrop-blur-md border border-white/25 flex items-center justify-center group-hover:scale-110 transition-transform">
-                  <action.icon className="text-white" size={20} />
-                </div>
-                <span className="text-sm font-medium text-white">{action.label}</span>
-              </button>
-            ))}
-          </div>
+          <h3 className="text-lg font-semibold text-white mb-4">Manage School Fees</h3>
+          <form className="space-y-4" onSubmit={submitFee}>
+            <select className="input-glassmorphism w-full" value={feeForm.student} onChange={(event) => setFeeForm((current) => ({ ...current, student: event.target.value }))}>
+              <option value="">Select student</option>
+              {students.map((student) => (
+                <option key={getId(student)} value={getId(student)} className="bg-gray-900">
+                  {student.userId?.name ?? 'Student'}
+                </option>
+              ))}
+            </select>
+            <input className="input-glassmorphism w-full" type="number" placeholder="Amount" value={feeForm.amount} onChange={(event) => setFeeForm((current) => ({ ...current, amount: event.target.value }))} required />
+            <input className="input-glassmorphism w-full" type="number" placeholder="Paid" value={feeForm.paid} onChange={(event) => setFeeForm((current) => ({ ...current, paid: event.target.value }))} required />
+            <select className="input-glassmorphism w-full" value={feeForm.status} onChange={(event) => setFeeForm((current) => ({ ...current, status: event.target.value }))}>
+              {['pending', 'partial', 'paid', 'overdue'].map((status) => <option key={status} value={status} className="bg-gray-900">{status}</option>)}
+            </select>
+            <input className="input-glassmorphism w-full" type="date" value={feeForm.dueDate} onChange={(event) => setFeeForm((current) => ({ ...current, dueDate: event.target.value }))} required />
+            <button type="submit" disabled={saving === 'fee'} className="btn-primary px-4 py-2 rounded-lg">
+              {saving === 'fee' ? 'Saving...' : 'Create Fee Record'}
+            </button>
+          </form>
         </div>
 
-        {/* Recent Transactions */}
         <div className="card-glassmorphism">
-          <h3 className="text-lg font-semibold text-white mb-4">Recent Transactions</h3>
+          <h3 className="text-lg font-semibold text-white mb-4">Financial Reports</h3>
+          <form className="space-y-4 mb-6" onSubmit={submitReport}>
+            <input className="input-glassmorphism w-full" placeholder="Report title" value={reportForm.title} onChange={(event) => setReportForm((current) => ({ ...current, title: event.target.value }))} required />
+            <select className="input-glassmorphism w-full" value={reportForm.type} onChange={(event) => setReportForm((current) => ({ ...current, type: event.target.value }))}>
+              {['finance', 'attendance', 'academic', 'custom'].map((type) => <option key={type} value={type} className="bg-gray-900">{type}</option>)}
+            </select>
+            <input className="input-glassmorphism w-full" placeholder="Period" value={reportForm.period} onChange={(event) => setReportForm((current) => ({ ...current, period: event.target.value }))} />
+            <textarea className="input-glassmorphism w-full min-h-28" placeholder="Summary" value={reportForm.summary} onChange={(event) => setReportForm((current) => ({ ...current, summary: event.target.value }))} />
+            <button type="submit" disabled={saving === 'report'} className="btn-primary px-4 py-2 rounded-lg">
+              {saving === 'report' ? 'Saving...' : 'Create Report'}
+            </button>
+          </form>
+
           <div className="space-y-3">
-            {recentTransactions.map((transaction) => (
-              <div key={transaction.id} className="flex items-center justify-between p-3 bg-white/5 backdrop-blur-sm border border-white/10 rounded-lg shadow-sm">
-                <div>
-                  <p className="text-sm font-medium text-white">{transaction.student}</p>
-                  <p className="text-xs text-gray-200">{transaction.type}</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm font-bold text-white">${transaction.amount}</p>
-                  <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${
-                    transaction.status === 'completed' 
-                      ? 'bg-green-500/20 text-green-300' 
-                      : 'bg-yellow-500/20 text-yellow-300'
-                  }`}>
-                    {transaction.status}
-                  </span>
-                </div>
+            {reports.length ? reports.map((report) => (
+              <div key={report._id ?? report.id} className="p-3 rounded-xl bg-white/5 border border-white/10">
+                <p className="text-white font-medium">{report.title}</p>
+                <p className="text-white/60 text-xs mt-1 capitalize">{report.type} • {report.period || 'No period set'}</p>
               </div>
-            ))}
+            )) : <p className="text-white/70">No reports available.</p>}
           </div>
-          <button className="w-full mt-4 text-sm text-gray-200 hover:text-white font-medium transition-colors">
-            View all transactions
-          </button>
-        </div>
-
-        {/* Pending Payments */}
-        <div className="card-glassmorphism">
-          <h3 className="text-lg font-semibold text-white mb-4">Overdue Payments</h3>
-          <div className="space-y-3">
-            {pendingPayments.map((payment) => (
-              <div key={payment.id} className="flex items-center justify-between p-3 bg-white/5 backdrop-blur-sm border border-white/10 rounded-lg shadow-sm">
-                <div>
-                  <p className="text-sm font-medium text-white">{payment.student}</p>
-                  <p className="text-xs text-gray-200">{payment.class}</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm font-bold text-white">${payment.amount}</p>
-                  <p className="text-xs text-red-300">{payment.daysOverdue} days overdue</p>
-                </div>
-              </div>
-            ))}
-          </div>
-          <button className="w-full mt-4 text-sm text-gray-200 hover:text-white font-medium transition-colors">
-            View all overdue
-          </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Monthly Collection */}
-        <div className="card-glassmorphism">
-          <h3 className="text-lg font-semibold text-white mb-4">Monthly Collection</h3>
-          <div className="space-y-4">
-            {monthlyCollection.map((month) => (
-              <div key={month.month} className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium text-white">{month.month}</span>
-                  <span className="text-sm text-gray-200">
-                    ${month.collected.toLocaleString()} / ${month.target.toLocaleString()}
-                  </span>
-                </div>
-                <div className="w-full bg-white/10 rounded-full h-2">
-                  <div 
-                    className="bg-gradient-to-r from-blue-500 to-purple-500 h-2 rounded-full transition-all duration-300"
-                    style={{ width: `${(month.collected / month.target) * 100}%` }}
-                  ></div>
-                </div>
-                <div className="text-xs text-gray-200">
-                  {((month.collected / month.target) * 100).toFixed(1)}% of target
-                </div>
+      <div className="card-glassmorphism">
+        <h3 className="text-lg font-semibold text-white mb-4">Track Payments</h3>
+        <div className="space-y-3">
+          {fees.length ? fees.map((fee) => (
+            <div key={fee._id ?? fee.id} className="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/10">
+              <div>
+                <p className="text-white">{fee.student?.userId?.name ?? 'Student'}</p>
+                <p className="text-white/60 text-xs">Due {new Date(fee.dueDate).toLocaleDateString()}</p>
               </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Fee Categories */}
-        <div className="card-glassmorphism">
-          <h3 className="text-lg font-semibold text-white mb-4">Fee Categories</h3>
-          <div className="space-y-4">
-            {feeCategories.map((category) => (
-              <div key={category.category} className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium text-white">{category.category}</span>
-                  <span className="text-sm text-gray-200">
-                    ${category.collected.toLocaleString()} / ${category.total.toLocaleString()}
-                  </span>
-                </div>
-                <div className="w-full bg-white/10 rounded-full h-2">
-                  <div 
-                    className="bg-gradient-to-r from-green-500 to-blue-500 h-2 rounded-full transition-all duration-300"
-                    style={{ width: `${(category.collected / category.total) * 100}%` }}
-                  ></div>
-                </div>
-                <div className="flex justify-between text-xs text-gray-200">
-                  <span>Collected: {((category.collected / category.total) * 100).toFixed(1)}%</span>
-                  <span>Pending: ${category.pending.toLocaleString()}</span>
-                </div>
+              <div className="text-right">
+                <p className="text-white font-semibold">${fee.amount}</p>
+                <p className="text-white/60 text-xs capitalize">{fee.status}</p>
               </div>
-            ))}
-          </div>
+            </div>
+          )) : <p className="text-white/70">No fee records available.</p>}
         </div>
       </div>
     </div>

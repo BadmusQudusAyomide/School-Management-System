@@ -7,7 +7,6 @@ const parentSchema = new mongoose.Schema(
       ref: "User",
       required: true,
       unique: true,
-      index: true,
     },
     children: [
       {
@@ -30,8 +29,6 @@ const parentSchema = new mongoose.Schema(
     timestamps: true,
   }
 );
-
-parentSchema.index({ userId: 1 });
 
 const Parent = mongoose.model("Parent", parentSchema);
 

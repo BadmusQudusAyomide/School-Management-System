@@ -1,12 +1,20 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
-import type { User } from '../types/index';
+import type { User, LoginForm, SchoolSignupForm, ApiResponse, School } from '../types/index';
+import { api } from '../lib/api';
+import {
+  clearAuthStorage,
+  getStoredUser,
+  setStoredAccessToken,
+  setStoredUser,
+} from '../lib/authStorage';
 
 interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
-  login: (email: string, password: string) => Promise<boolean>;
-  logout: () => void;
+  login: (credentials: LoginForm | string, password?: string) => Promise<boolean>;
+  signupAdmin: (payload: SchoolSignupForm) => Promise<boolean>;
+  logout: () => Promise<void>;
   loading: boolean;
 }
 
@@ -28,143 +36,80 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const persistAuthSession = (authData: { user: User; accessToken: string }) => {
+    setStoredAccessToken(authData.accessToken);
+    setStoredUser(authData.user);
+    setUser(authData.user);
+  };
+
   useEffect(() => {
-    // Check if user is logged in on app start
-    const storedUser = localStorage.getItem('user');
+    const storedUser = getStoredUser();
     if (storedUser) {
-      try {
-        setUser(JSON.parse(storedUser));
-      } catch (error) {
-        console.error('Error parsing stored user:', error);
-        localStorage.removeItem('user');
-      }
+      setUser(storedUser);
     }
     setLoading(false);
   }, []);
 
-  const login = async (email: string, password: string): Promise<boolean> => {
+  const login = async (credentials: LoginForm | string, password?: string): Promise<boolean> => {
     setLoading(true);
     
     try {
-      // Mock authentication - replace with actual API call
-      const mockUsers: User[] = [
-        {
-          id: '1',
-          email: 'admin@school.com',
-          firstName: 'Qudus',
-          lastName: 'Admin',
-          role: 'admin',
-          avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150',
-          phone: '+1234567890',
-          address: '123 Admin St',
-          schoolId: 'school-1',
-          isActive: true,
-          createdAt: '2024-01-01T00:00:00Z',
-          updatedAt: '2024-01-01T00:00:00Z'
-        },
-        {
-          id: '2',
-          email: 'teacher@school.com',
-          firstName: 'Jane',
-          lastName: 'Smith',
-          role: 'teacher',
-          avatar: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150',
-          phone: '+1234567891',
-          address: '456 Teacher Ave',
-          schoolId: 'school-1',
-          isActive: true,
-          createdAt: '2024-01-01T00:00:00Z',
-          updatedAt: '2024-01-01T00:00:00Z'
-        },
-        {
-          id: '3',
-          email: 'student@school.com',
-          firstName: 'Qudus',
-          lastName: 'Ayomide',
-          role: 'student',
-          avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150',
-          phone: '+1234567892',
-          address: '789 Student Rd',
-          schoolId: 'school-1',
-          isActive: true,
-          createdAt: '2024-01-01T00:00:00Z',
-          updatedAt: '2024-01-01T00:00:00Z'
-        },
-        {
-          id: '4',
-          email: 'parent@school.com',
-          firstName: 'Badmus',
-          lastName: 'Adufe',
-          role: 'parent',
-          avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150',
-          phone: '+1234567893',
-          address: '789 Student Rd',
-          schoolId: 'school-1',
-          isActive: true,
-          createdAt: '2024-01-01T00:00:00Z',
-          updatedAt: '2024-01-01T00:00:00Z'
-        },
-        {
-          id: '5',
-          email: 'accountant@school.com',
-          firstName: 'David',
-          lastName: 'Brown',
-          role: 'accountant',
-          avatar: 'https://images.unsplash.com/photo-1560250097-0b93528c311a?w=150',
-          phone: '+1234567894',
-          address: '321 Finance St',
-          schoolId: 'school-1',
-          isActive: true,
-          createdAt: '2024-01-01T00:00:00Z',
-          updatedAt: '2024-01-01T00:00:00Z'
-        },
-        // Additional students for parent relationships
-        {
-          id: '6',
-          email: 'student2@school.com',
-          firstName: 'Fatima',
-          lastName: 'Ayomide',
-          role: 'student',
-          avatar: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150',
-          phone: '+1234567895',
-          address: '789 Student Rd',
-          schoolId: 'school-1',
-          isActive: true,
-          createdAt: '2024-01-01T00:00:00Z',
-          updatedAt: '2024-01-01T00:00:00Z'
-        }
-      ];
+      const payload =
+        typeof credentials === 'string'
+          ? { email: credentials, password: password ?? '' }
+          : credentials;
 
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const response = await api.post<ApiResponse<{
+        user: User;
+        accessToken: string;
+      }>>('/auth/login', payload);
 
-      const foundUser = mockUsers.find(u => u.email === email);
-      
-      if (foundUser && password === 'password123') {
-        setUser(foundUser);
-        localStorage.setItem('user', JSON.stringify(foundUser));
-        setLoading(false);
-        return true;
-      } else {
-        setLoading(false);
-        return false;
-      }
+      persistAuthSession(response.data.data);
+      return true;
     } catch (error) {
       console.error('Login error:', error);
-      setLoading(false);
       return false;
+    } finally {
+      setLoading(false);
     }
   };
 
-  const logout = () => {
+  const signupAdmin = async (payload: SchoolSignupForm): Promise<boolean> => {
+    setLoading(true);
+
+    try {
+      const response = await api.post<ApiResponse<{
+        user: User;
+        school: School;
+        accessToken: string;
+      }>>('/auth/admin-signup', payload);
+
+      persistAuthSession(response.data.data);
+      return true;
+    } catch (error) {
+      console.error('Admin signup error:', error);
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const logout = async () => {
+    try {
+      await api.post('/auth/logout');
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
+
     setUser(null);
-    localStorage.removeItem('user');
+    clearAuthStorage();
   };
 
   const value: AuthContextType = {
     user,
     isAuthenticated: !!user,
     login,
+    signupAdmin,
     logout,
     loading
   };

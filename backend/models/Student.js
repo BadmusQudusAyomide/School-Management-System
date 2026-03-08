@@ -7,7 +7,6 @@ const studentSchema = new mongoose.Schema(
       ref: "User",
       required: true,
       unique: true,
-      index: true,
     },
     admissionNumber: {
       type: String,
@@ -54,13 +53,44 @@ const studentSchema = new mongoose.Schema(
       default: "pending",
       index: true,
     },
+    documents: [
+      {
+        originalName: {
+          type: String,
+          required: true,
+          trim: true,
+        },
+        filename: {
+          type: String,
+          required: true,
+          trim: true,
+        },
+        path: {
+          type: String,
+          required: true,
+          trim: true,
+        },
+        mimeType: {
+          type: String,
+          required: true,
+          trim: true,
+        },
+        size: {
+          type: Number,
+          required: true,
+          min: 0,
+        },
+        uploadedAt: {
+          type: Date,
+          default: Date.now,
+        },
+      },
+    ],
   },
   {
     timestamps: true,
   }
 );
-
-studentSchema.index({ admissionNumber: 1 });
 studentSchema.index({ class: 1, section: 1 });
 
 const Student = mongoose.model("Student", studentSchema);

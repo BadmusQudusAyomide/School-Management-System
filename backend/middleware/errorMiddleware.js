@@ -5,6 +5,14 @@ export const notFound = (req, _res, next) => {
 };
 
 export const errorHandler = (error, _req, res, _next) => {
+  if (error instanceof SyntaxError && "body" in error) {
+    res.status(400).json({
+      success: false,
+      message: "Malformed JSON payload",
+    });
+    return;
+  }
+
   const statusCode = error.statusCode || 500;
 
   res.status(statusCode).json({

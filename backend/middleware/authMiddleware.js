@@ -1,11 +1,9 @@
-import jwt from "jsonwebtoken";
-
-import { env } from "../config/env.js";
 import User from "../models/User.js";
 import asyncHandler from "../utils/asyncHandler.js";
-import { unauthorized, forbidden } from "../utils/errors.js";
+import { unauthorized } from "../utils/errors.js";
+import { verifyAccessToken } from "../utils/token.js";
 
-export const protect = asyncHandler(async (req, _res, next) => {
+export const authMiddleware = asyncHandler(async (req, _res, next) => {
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
@@ -15,10 +13,10 @@ export const protect = asyncHandler(async (req, _res, next) => {
   const token = authHeader.split(" ")[1];
 
   try {
-    const decoded = jwt.verify(token, env.jwtSecret);
+    const decoded = verifyAccessToken(token);
     const user = await User.findById(decoded.id).select("-password");
 
-    if (!user) {
+    if (!user || !user.isActive) {
       throw unauthorized("User associated with this token no longer exists");
     }
 
@@ -29,12 +27,6 @@ export const protect = asyncHandler(async (req, _res, next) => {
   }
 });
 
-export const authorize = (...roles) => {
-  return (req, _res, next) => {
-    if (!req.user || !roles.includes(req.user.role)) {
-      throw forbidden("You do not have permission to access this resource");
-    }
+export const protect = authMiddleware;
 
-    next();
-  };
-};
+export default authMiddleware;

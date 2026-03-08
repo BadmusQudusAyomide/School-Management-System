@@ -1,173 +1,187 @@
-import React from 'react';
-import { Users, GraduationCap, DollarSign, TrendingUp, Calendar, Bell } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Users, GraduationCap, DollarSign, School } from 'lucide-react';
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Line,
+  LineChart,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
 import StatCard from '../../components/dashboard/StatCard';
+import DashboardState from '../../components/dashboard/DashboardState';
+import { api } from '../../lib/api';
+import { analyticsService } from '../../services/analyticsService';
+
+const attendanceColors = ['#34d399', '#f87171', '#fbbf24', '#60a5fa'];
 
 const AdminDashboard: React.FC = () => {
-  // Mock data - replace with actual API calls
-  const stats = {
-    totalStudents: 1248,
-    totalTeachers: 87,
-    outstandingFees: 45600,
-    attendanceRate: 94.2
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [stats, setStats] = useState({
+    totalStudents: 0,
+    totalTeachers: 0,
+    totalClasses: 0,
+    feeRevenue: 0,
+  });
+  const [attendanceData, setAttendanceData] = useState<Array<{ name: string; value: number }>>([]);
+  const [revenueData, setRevenueData] = useState<Array<{ name: string; revenue: number }>>([]);
+  const [studentGrowthData, setStudentGrowthData] = useState<Array<{ name: string; students: number }>>([]);
+  const [recentActivities, setRecentActivities] = useState<Array<{ id: string; message: string; time: string }>>([]);
+
+  const loadDashboard = async () => {
+    setLoading(true);
+    setError('');
+
+    try {
+      const [studentsRes, teachersRes, classesRes, attendanceRes, feesRes, noticesRes] = await Promise.all([
+        api.get('/students'),
+        api.get('/teachers'),
+        api.get('/classes'),
+        api.get('/attendance'),
+        api.get('/fees'),
+        api.get('/notices'),
+      ]);
+
+      const students = studentsRes.data.data ?? [];
+      const teachers = teachersRes.data.data ?? [];
+      const classes = classesRes.data.data ?? [];
+      const attendance = attendanceRes.data.data ?? [];
+      const fees = feesRes.data.data ?? [];
+      const notices = noticesRes.data.data ?? [];
+
+      const feeRevenue = fees.reduce((sum: number, fee: { paid?: number }) => sum + (fee.paid ?? 0), 0);
+
+      setStats({
+        totalStudents: students.length,
+        totalTeachers: teachers.length,
+        totalClasses: classes.length,
+        feeRevenue,
+      });
+
+      setAttendanceData(analyticsService.buildAttendanceBreakdown(attendance));
+      setRevenueData(analyticsService.buildRevenueSeries(fees));
+      setStudentGrowthData(analyticsService.buildStudentGrowthSeries(students));
+
+      setRecentActivities([
+        ...students.slice(0, 2).map((student: { _id?: string; admissionNumber?: string; userId?: { name?: string } }) => ({
+          id: student._id ?? crypto.randomUUID(),
+          message: `${student.userId?.name ?? 'Student'} joined with admission number ${student.admissionNumber ?? 'N/A'}`,
+          time: 'Student onboarding',
+        })),
+        ...notices.slice(0, 2).map((notice: { _id?: string; title?: string; createdAt?: string }) => ({
+          id: notice._id ?? crypto.randomUUID(),
+          message: `Notice published: ${notice.title ?? 'Untitled notice'}`,
+          time: notice.createdAt ? new Date(notice.createdAt).toLocaleDateString() : 'Recently',
+        })),
+      ]);
+    } catch (fetchError) {
+      console.error(fetchError);
+      setError('Failed to load admin dashboard data.');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const recentActivities = [
-    { id: 1, type: 'student', message: 'New student Qudus Ayomide enrolled in Grade 10-A', time: '2 hours ago' },
-    { id: 2, type: 'fee', message: 'Fee payment of $500 received from Badmus', time: '4 hours ago' },
-    { id: 3, type: 'teacher', message: 'Teacher Codestream updated Grade 9-B timetable', time: '6 hours ago' },
-    { id: 4, type: 'notice', message: 'New notice published: Parent-Teacher Meeting', time: '1 day ago' }
-  ];
+  useEffect(() => {
+    void loadDashboard();
+  }, []);
 
-  const upcomingEvents = [
-    { id: 1, title: 'Parent-Teacher Meeting', date: '2024-02-15', time: '10:00 AM' },
-    { id: 2, title: 'Science Fair', date: '2024-02-20', time: '9:00 AM' },
-    { id: 3, title: 'Sports Day', date: '2024-02-25', time: '8:00 AM' },
-    { id: 4, title: 'Annual Exam', date: '2024-03-01', time: 'All Day' }
-  ];
+  if (loading) {
+    return <DashboardState title="Loading dashboard" message="Preparing analytics and live metrics..." />;
+  }
 
-  const quickActions = [
-    { icon: Users, label: 'Add Student', path: '/students/add', color: 'blue' as const },
-    { icon: GraduationCap, label: 'Add Teacher', path: '/teachers/add', color: 'green' as const },
-    { icon: Calendar, label: 'Schedule Event', path: '/events/add', color: 'purple' as const },
-    { icon: Bell, label: 'Send Notice', path: '/notices/add', color: 'yellow' as const }
-  ];
+  if (error) {
+    return <DashboardState title="Dashboard unavailable" message={error} actionLabel="Retry" onAction={() => void loadDashboard()} />;
+  }
 
   return (
     <div className="space-y-6">
-      {/* Welcome Section */}
       <div className="card-glassmorphism">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-white">Welcome back, Admin!</h1>
-            <p className="text-gray-200 mt-1">Here's what's happening at your school today.</p>
+            <h1 className="text-2xl font-bold text-white">Admin Dashboard</h1>
+            <p className="text-gray-200 mt-1">Overview of enrollment, staffing, classes, fee revenue, and attendance analytics.</p>
           </div>
           <div className="text-right">
             <p className="text-sm text-white/60">Today</p>
             <p className="text-lg font-semibold text-white">
-              {new Date().toLocaleDateString('en-US', { 
-                weekday: 'long', 
-                year: 'numeric', 
-                month: 'long', 
-                day: 'numeric' 
-              })}
+              {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
             </p>
           </div>
         </div>
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard
-          title="Total Students"
-          value={stats.totalStudents.toLocaleString()}
-          icon={Users}
-          trend={{ value: 5.2, isPositive: true }}
-          color="blue"
-        />
-        <StatCard
-          title="Total Teachers"
-          value={stats.totalTeachers}
-          icon={GraduationCap}
-          trend={{ value: 2.1, isPositive: true }}
-          color="green"
-        />
-        <StatCard
-          title="Outstanding Fees"
-          value={`$${stats.outstandingFees.toLocaleString()}`}
-          icon={DollarSign}
-          trend={{ value: -8.3, isPositive: false }}
-          color="red"
-        />
-        <StatCard
-          title="Attendance Rate"
-          value={`${stats.attendanceRate}%`}
-          icon={TrendingUp}
-          trend={{ value: 1.2, isPositive: true }}
-          color="purple"
-        />
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+        <StatCard title="Total Students" value={stats.totalStudents} icon={Users} color="blue" />
+        <StatCard title="Total Teachers" value={stats.totalTeachers} icon={GraduationCap} color="green" />
+        <StatCard title="Total Classes" value={stats.totalClasses} icon={School} color="purple" />
+        <StatCard title="Fee Revenue" value={`$${stats.feeRevenue.toLocaleString()}`} icon={DollarSign} color="yellow" />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Quick Actions */}
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         <div className="card-glassmorphism">
-          <h3 className="text-lg font-semibold text-white mb-4">Quick Actions</h3>
-          <div className="grid grid-cols-2 gap-4">
-            {quickActions.map((action) => (
-              <button
-                key={action.label}
-                className="flex flex-col items-center gap-3 p-4 rounded-xl bg-white/5 backdrop-blur-md border border-white/10 hover:bg-white/10 hover:border-white/20 transition-all duration-200 group shadow-lg"
-              >
-                <div className="w-12 h-12 rounded-xl bg-white/15 backdrop-blur-md border border-white/25 flex items-center justify-center group-hover:scale-110 transition-transform">
-                  <action.icon className="text-white" size={20} />
-                </div>
-                <span className="text-sm font-medium text-white">{action.label}</span>
-              </button>
-            ))}
+          <h3 className="text-lg font-semibold text-white mb-4">Attendance Analytics</h3>
+          <div className="h-72">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie data={attendanceData} dataKey="value" nameKey="name" outerRadius={100} label>
+                  {attendanceData.map((entry, index) => (
+                    <Cell key={entry.name} fill={attendanceColors[index % attendanceColors.length]} />
+                  ))}
+                </Pie>
+                <Tooltip />
+              </PieChart>
+            </ResponsiveContainer>
           </div>
         </div>
 
-        {/* Recent Activities */}
         <div className="card-glassmorphism">
-          <h3 className="text-lg font-semibold text-white mb-4">Recent Activities</h3>
-          <div className="space-y-3">
-            {recentActivities.map((activity) => (
-              <div key={activity.id} className="flex items-start space-x-3">
-                <div className="w-2 h-2 bg-white rounded-full mt-2 flex-shrink-0"></div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm text-white">{activity.message}</p>
-                  <p className="text-xs text-gray-200 mt-1">{activity.time}</p>
-                </div>
-              </div>
-            ))}
+          <h3 className="text-lg font-semibold text-white mb-4">Revenue Trend</h3>
+          <div className="h-72">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={revenueData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" />
+                <XAxis dataKey="name" stroke="#d1d5db" />
+                <YAxis stroke="#d1d5db" />
+                <Tooltip />
+                <Bar dataKey="revenue" fill="#60a5fa" radius={[8, 8, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
           </div>
-          <button className="w-full mt-4 text-sm text-gray-200 hover:text-white font-medium transition-colors">
-            View all activities
-          </button>
-        </div>
-
-        {/* Upcoming Events */}
-        <div className="card-glassmorphism">
-          <h3 className="text-lg font-semibold text-white mb-4">Upcoming Events</h3>
-          <div className="space-y-3">
-            {upcomingEvents.map((event) => (
-              <div key={event.id} className="flex items-center justify-between p-3 bg-white/5 backdrop-blur-sm border border-white/10 rounded-lg shadow-sm">
-                <div>
-                  <p className="text-sm font-medium text-white">{event.title}</p>
-                  <p className="text-xs text-gray-200">{event.time}</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-xs text-gray-200">
-                    {new Date(event.date).toLocaleDateString('en-US', { 
-                      month: 'short', 
-                      day: 'numeric' 
-                    })}
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
-          <button className="w-full mt-4 text-sm text-gray-200 hover:text-white font-medium transition-colors">
-            View calendar
-          </button>
         </div>
       </div>
 
-      {/* Charts Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Attendance Chart Placeholder */}
-        <div className="card-glassmorphism">
-          <h3 className="text-lg font-semibold text-white mb-4">Attendance Overview</h3>
-          <div className="h-64 bg-white/5 backdrop-blur-sm border border-white/10 rounded-lg flex items-center justify-center shadow-inner">
-            <p className="text-gray-200">Attendance Chart Placeholder</p>
-          </div>
+      <div className="card-glassmorphism">
+        <h3 className="text-lg font-semibold text-white mb-4">Student Growth</h3>
+        <div className="h-72">
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={studentGrowthData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" />
+              <XAxis dataKey="name" stroke="#d1d5db" />
+              <YAxis stroke="#d1d5db" allowDecimals={false} />
+              <Tooltip />
+              <Line type="monotone" dataKey="students" stroke="#a78bfa" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+            </LineChart>
+          </ResponsiveContainer>
         </div>
+      </div>
 
-        {/* Revenue Chart Placeholder */}
-        <div className="card-glassmorphism">
-          <h3 className="text-lg font-semibold text-white mb-4">Fee Collection</h3>
-          <div className="h-64 bg-white/5 backdrop-blur-sm border border-white/10 rounded-lg flex items-center justify-center shadow-inner">
-            <p className="text-gray-200">Revenue Chart Placeholder</p>
-          </div>
+      <div className="card-glassmorphism">
+        <h3 className="text-lg font-semibold text-white mb-4">Recent Activity</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {recentActivities.length ? recentActivities.map((activity) => (
+            <div key={activity.id} className="p-4 rounded-xl bg-white/5 border border-white/10">
+              <p className="text-white text-sm">{activity.message}</p>
+              <p className="text-white/60 text-xs mt-2">{activity.time}</p>
+            </div>
+          )) : <p className="text-white/70">No recent activity found.</p>}
         </div>
       </div>
     </div>

@@ -1,6 +1,8 @@
 import React from 'react';
 import { Bell, Search, Menu } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { useNotifications } from '../../contexts/NotificationsContext';
 
 interface HeaderProps {
   title: string;
@@ -9,6 +11,8 @@ interface HeaderProps {
 
 const Header: React.FC<HeaderProps> = ({ title, onMenuClick }) => {
   const { user } = useAuth();
+  const { unreadCount } = useNotifications();
+  const navigate = useNavigate();
 
   return (
     <header className="bg-white/10 backdrop-blur-md border-b border-white/20 px-6 py-4 shadow-lg">
@@ -35,23 +39,29 @@ const Header: React.FC<HeaderProps> = ({ title, onMenuClick }) => {
           </div>
 
           {/* Notifications */}
-          <button className="relative p-2 rounded-xl hover:bg-white/5 transition-colors">
+          <button
+            type="button"
+            onClick={() => navigate('/notifications')}
+            className="relative p-2 rounded-xl hover:bg-white/5 transition-colors"
+          >
             <Bell size={20} className="text-white" />
-            <span className="absolute -top-1 -right-1 w-5 h-5 bg-white text-black text-xs rounded-full flex items-center justify-center">
-              3
-            </span>
+            {unreadCount ? (
+              <span className="absolute -top-1 -right-1 min-w-5 h-5 px-1 bg-white text-black text-xs rounded-full flex items-center justify-center">
+                {unreadCount > 99 ? '99+' : unreadCount}
+              </span>
+            ) : null}
           </button>
 
           {/* User Avatar */}
           <div className="flex items-center space-x-3">
             <img
-              src={user?.avatar || 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150'}
-              alt={`${user?.firstName} ${user?.lastName}`}
+              src={user?.profilePicture || 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150'}
+              alt={user?.name || 'User avatar'}
               className="w-10 h-10 rounded-full object-cover border-2 border-white/20"
             />
             <div className="hidden md:block">
               <p className="text-sm font-medium text-white">
-                {user?.firstName} {user?.lastName}
+                {user?.name}
               </p>
               <p className="text-xs text-white/60 capitalize">{user?.role}</p>
             </div>

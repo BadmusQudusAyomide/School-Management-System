@@ -1,308 +1,170 @@
-import React, { useState } from 'react';
-import { TrendingUp, Clock, DollarSign, Calendar, Bell, ChevronDown } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { ResponsiveContainer, LineChart, Line, CartesianGrid, XAxis, YAxis, Tooltip } from 'recharts';
+import { TrendingUp, Clock, DollarSign } from 'lucide-react';
 import StatCard from '../../components/dashboard/StatCard';
+import DashboardState from '../../components/dashboard/DashboardState';
 import { useAuth } from '../../contexts/AuthContext';
-
-interface Child {
-  id: string;
-  name: string;
-  class: string;
-  grade: string;
-  attendanceRate: number;
-  averageGrade: number;
-  avatar: string;
-}
+import { api } from '../../lib/api';
 
 const ParentDashboard: React.FC = () => {
   const { user } = useAuth();
-  const [selectedChild, setSelectedChild] = useState<string>('1');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [children, setChildren] = useState<any[]>([]);
+  const [selectedChildId, setSelectedChildId] = useState('');
+  const [performance, setPerformance] = useState<Array<{ subject: string; score: number }>>([]);
+  const [attendance, setAttendance] = useState<any[]>([]);
+  const [fees, setFees] = useState<any[]>([]);
+  const [stats, setStats] = useState({ averageGrade: 0, attendanceRate: 0, pendingFees: 0 });
 
-  // Mock data for children - this would come from API based on parent ID
-  const children: Child[] = [
-    {
-      id: '1',
-      name: 'Qudus Ayomide',
-      class: 'Grade 10-A',
-      grade: '10th',
-      attendanceRate: 92.5,
-      averageGrade: 85.2,
-      avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150'
-    },
-    {
-      id: '2',
-      name: 'Fatima Ayomide',
-      class: 'Grade 8-B',
-      grade: '8th',
-      attendanceRate: 95.8,
-      averageGrade: 91.4,
-      avatar: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150'
-    }
-  ];
+  useEffect(() => {
+    const loadChildren = async () => {
+      if (!user?.childIds?.length) {
+        setError('No children linked to this parent account.');
+        setLoading(false);
+        return;
+      }
 
-  const currentChild = children.find(child => child.id === selectedChild) || children[0];
+      try {
+        const responses = await Promise.all(user.childIds.map((id) => api.get(`/students/${id}`)));
+        const data = responses.map((response) => response.data.data);
+        setChildren(data);
+        setSelectedChildId(data[0]?._id ?? data[0]?.id ?? '');
+      } catch (fetchError) {
+        console.error(fetchError);
+        setError('Failed to load child profiles.');
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  // Mock data - replace with actual API calls based on selected child
-  const stats = {
-    attendanceRate: currentChild.attendanceRate,
-    averageGrade: currentChild.averageGrade,
-    upcomingExams: 3,
-    pendingFees: 1200
-  };
+    void loadChildren();
+  }, [user?.childIds]);
 
-  const recentGrades = [
-    { id: 1, subject: 'Mathematics', assessment: 'Mid-term Exam', grade: 'A', marks: '92/100', date: '2024-01-15' },
-    { id: 2, subject: 'Physics', assessment: 'Lab Report', grade: 'B+', marks: '87/100', date: '2024-01-12' },
-    { id: 3, subject: 'English', assessment: 'Essay Assignment', grade: 'A-', marks: '89/100', date: '2024-01-10' },
-    { id: 4, subject: 'Chemistry', assessment: 'Quiz', grade: 'B', marks: '82/100', date: '2024-01-08' }
-  ];
+  useEffect(() => {
+    const loadChildData = async () => {
+      const child = children.find((item) => (item._id ?? item.id) === selectedChildId);
+      if (!child) {
+        return;
+      }
 
-  const attendanceData = [
-    { date: '2024-01-15', status: 'present' },
-    { date: '2024-01-16', status: 'present' },
-    { date: '2024-01-17', status: 'absent' },
-    { date: '2024-01-18', status: 'present' },
-    { date: '2024-01-19', status: 'present' },
-    { date: '2024-01-22', status: 'present' },
-    { date: '2024-01-23', status: 'late' }
-  ];
+      setLoading(true);
+      setError('');
 
-  const upcomingEvents = [
-    { id: 1, title: 'Parent-Teacher Meeting', date: '2024-02-15', time: '10:00 AM', type: 'meeting' },
-    { id: 2, title: 'Mathematics Exam', date: '2024-02-18', time: '09:00 AM', type: 'exam' },
-    { id: 3, title: 'Science Fair', date: '2024-02-20', time: '02:00 PM', type: 'event' },
-    { id: 4, title: 'Sports Day', date: '2024-02-25', time: '08:00 AM', type: 'event' }
-  ];
+      try {
+        const [gradesRes, attendanceRes, feesRes] = await Promise.all([
+          api.get(`/grades/student/${child._id ?? child.id}`),
+          api.get(`/attendance/class/${child.class?._id ?? child.class?.id}`),
+          api.get(`/fees/student/${child._id ?? child.id}`),
+        ]);
 
-  const feeDetails = [
-    { id: 1, type: 'Tuition Fee', amount: 800, status: 'paid', dueDate: '2024-01-15' },
-    { id: 2, type: 'Transport Fee', amount: 200, status: 'pending', dueDate: '2024-02-15' },
-    { id: 3, type: 'Library Fee', amount: 100, status: 'pending', dueDate: '2024-02-15' },
-    { id: 4, type: 'Lab Fee', amount: 150, status: 'paid', dueDate: '2024-01-15' }
-  ];
+        const grades = gradesRes.data.data ?? [];
+        const childAttendance = (attendanceRes.data.data ?? []).filter(
+          (entry: { student?: { _id?: string; id?: string } }) => (entry.student?._id ?? entry.student?.id) === (child._id ?? child.id)
+        );
+        const childFees = feesRes.data.data ?? [];
 
-  const quickActions = [
-    { icon: TrendingUp, label: 'View Grades', path: '/grades', color: 'blue' as const },
-    { icon: Clock, label: 'Check Attendance', path: '/attendance', color: 'green' as const },
-    { icon: DollarSign, label: 'Pay Fees', path: '/fees', color: 'yellow' as const },
-    { icon: Bell, label: 'Messages', path: '/messages', color: 'purple' as const }
-  ];
+        const averageGrade = grades.length
+          ? grades.reduce((sum: number, item: { score?: number }) => sum + (item.score ?? 0), 0) / grades.length
+          : 0;
+        const attendanceRate = childAttendance.length
+          ? (childAttendance.filter((item: { status?: string }) => item.status === 'present').length / childAttendance.length) * 100
+          : 0;
+        const pendingFees = childFees.reduce((sum: number, item: { amount?: number; paid?: number }) => sum + Math.max((item.amount ?? 0) - (item.paid ?? 0), 0), 0);
+
+        setPerformance(grades.map((item: { _id?: string; subject?: string; score?: number }) => ({
+          subject: item.subject ?? item._id ?? 'Subject',
+          score: item.score ?? 0,
+        })));
+        setAttendance(childAttendance);
+        setFees(childFees);
+        setStats({ averageGrade, attendanceRate, pendingFees });
+      } catch (fetchError) {
+        console.error(fetchError);
+        setError('Failed to load child performance data.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    void loadChildData();
+  }, [children, selectedChildId]);
+
+  if (loading && !children.length) {
+    return <DashboardState title="Loading dashboard" message="Fetching child performance, attendance, and fee payments..." />;
+  }
+
+  if (error && !children.length) {
+    return <DashboardState title="Dashboard unavailable" message={error} />;
+  }
 
   return (
     <div className="space-y-6">
-      {/* Welcome Section with Child Selector */}
       <div className="card-glassmorphism">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-white">Welcome back, {user?.firstName}!</h1>
-            <p className="text-gray-200 mt-1">Monitor your children's academic progress.</p>
-          </div>
-          <div className="text-right">
-            <p className="text-sm text-white/60">Today</p>
-            <p className="text-lg font-semibold text-white">
-              {new Date().toLocaleDateString('en-US', { 
-                weekday: 'long', 
-                year: 'numeric', 
-                month: 'long', 
-                day: 'numeric' 
-              })}
-            </p>
-          </div>
-        </div>
+        <h1 className="text-2xl font-bold text-white">Parent Dashboard</h1>
+        <p className="text-white/70 mt-2">Track child performance, attendance, and fee payments.</p>
       </div>
 
-      {/* Child Selector */}
+      {error && <DashboardState title="Update warning" message={error} />}
+
       <div className="card-glassmorphism">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-white">Select Child</h3>
-          <div className="relative">
-            <select
-              value={selectedChild}
-              onChange={(e) => setSelectedChild(e.target.value)}
-              className="appearance-none bg-white/10 backdrop-blur-md border border-white/20 text-white px-4 py-2 pr-8 rounded-lg focus:outline-none focus:ring-2 focus:ring-white/25"
-            >
-              {children.map((child) => (
-                <option key={child.id} value={child.id} className="bg-gray-800 text-white">
-                  {child.name} - {child.class}
-                </option>
-              ))}
-            </select>
-            <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 text-white/60" size={16} />
+        <label className="block text-sm text-white/70 mb-2">Child</label>
+        <select value={selectedChildId} onChange={(event) => setSelectedChildId(event.target.value)} className="input-glassmorphism w-full max-w-md">
+          {children.map((child) => (
+            <option key={child._id ?? child.id} value={child._id ?? child.id} className="bg-gray-900">
+              {child.userId?.name ?? 'Student'} - {child.class?.name ?? 'Class'}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <StatCard title="Average Grade" value={`${stats.averageGrade.toFixed(1)}%`} icon={TrendingUp} color="green" />
+        <StatCard title="Attendance" value={`${stats.attendanceRate.toFixed(1)}%`} icon={Clock} color="blue" />
+        <StatCard title="Pending Fees" value={`$${stats.pendingFees.toLocaleString()}`} icon={DollarSign} color="yellow" />
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+        <div className="card-glassmorphism">
+          <h3 className="text-lg font-semibold text-white mb-4">Child Performance</h3>
+          <div className="h-72">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={performance}>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" />
+                <XAxis dataKey="subject" stroke="#d1d5db" />
+                <YAxis stroke="#d1d5db" />
+                <Tooltip />
+                <Line type="monotone" dataKey="score" stroke="#34d399" strokeWidth={3} />
+              </LineChart>
+            </ResponsiveContainer>
           </div>
         </div>
-        
-        {/* Selected Child Info */}
-        <div className="flex items-center space-x-4 p-4 bg-white/5 backdrop-blur-sm border border-white/10 rounded-lg">
-          <img
-            src={currentChild.avatar}
-            alt={currentChild.name}
-            className="w-16 h-16 rounded-full object-cover border-2 border-white/20"
-          />
-          <div>
-            <h4 className="text-lg font-semibold text-white">{currentChild.name}</h4>
-            <p className="text-gray-200">{currentChild.class}</p>
-            <p className="text-sm text-white/60">Grade {currentChild.grade}</p>
+
+        <div className="card-glassmorphism">
+          <h3 className="text-lg font-semibold text-white mb-4">Attendance</h3>
+          <div className="space-y-3">
+            {attendance.length ? attendance.map((entry) => (
+              <div key={entry._id ?? entry.id} className="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/10">
+                <p className="text-white">{new Date(entry.date).toLocaleDateString()}</p>
+                <span className="text-white/80 capitalize">{entry.status}</span>
+              </div>
+            )) : <p className="text-white/70">No attendance records available.</p>}
           </div>
         </div>
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard
-          title="Attendance Rate"
-          value={`${stats.attendanceRate}%`}
-          icon={Clock}
-          trend={{ value: 2.3, isPositive: true }}
-          color="blue"
-        />
-        <StatCard
-          title="Average Grade"
-          value={`${stats.averageGrade}%`}
-          icon={TrendingUp}
-          trend={{ value: 3.2, isPositive: true }}
-          color="green"
-        />
-        <StatCard
-          title="Upcoming Exams"
-          value={stats.upcomingExams}
-          icon={Calendar}
-          trend={{ value: 0, isPositive: true }}
-          color="purple"
-        />
-        <StatCard
-          title="Pending Fees"
-          value={`$${stats.pendingFees}`}
-          icon={DollarSign}
-          trend={{ value: -15.2, isPositive: true }}
-          color="yellow"
-        />
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Quick Actions */}
-        <div className="card-glassmorphism">
-          <h3 className="text-lg font-semibold text-white mb-4">Quick Actions</h3>
-          <div className="grid grid-cols-2 gap-4">
-            {quickActions.map((action) => (
-              <button
-                key={action.label}
-                className="flex flex-col items-center gap-3 p-4 rounded-xl bg-white/5 backdrop-blur-md border border-white/10 hover:bg-white/10 hover:border-white/20 transition-all duration-200 group shadow-lg"
-              >
-                <div className="w-12 h-12 rounded-xl bg-white/15 backdrop-blur-md border border-white/25 flex items-center justify-center group-hover:scale-110 transition-transform">
-                  <action.icon className="text-white" size={20} />
-                </div>
-                <span className="text-sm font-medium text-white">{action.label}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Recent Grades */}
-        <div className="card-glassmorphism">
-          <h3 className="text-lg font-semibold text-white mb-4">Recent Grades</h3>
-          <div className="space-y-3">
-            {recentGrades.map((grade) => (
-              <div key={grade.id} className="flex items-center justify-between p-3 bg-white/5 backdrop-blur-sm border border-white/10 rounded-lg shadow-sm">
-                <div>
-                  <p className="text-sm font-medium text-white">{grade.subject}</p>
-                  <p className="text-xs text-gray-200">{grade.assessment}</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm font-bold text-white">{grade.grade}</p>
-                  <p className="text-xs text-gray-200">{grade.marks}</p>
-                </div>
+      <div className="card-glassmorphism">
+        <h3 className="text-lg font-semibold text-white mb-4">Fee Payments</h3>
+        <div className="space-y-3">
+          {fees.length ? fees.map((entry) => (
+            <div key={entry._id ?? entry.id} className="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/10">
+              <div>
+                <p className="text-white">${entry.amount}</p>
+                <p className="text-white/60 text-xs">Paid ${entry.paid ?? 0}</p>
               </div>
-            ))}
-          </div>
-          <button className="w-full mt-4 text-sm text-gray-200 hover:text-white font-medium transition-colors">
-            View all grades
-          </button>
-        </div>
-
-        {/* Recent Attendance */}
-        <div className="card-glassmorphism">
-          <h3 className="text-lg font-semibold text-white mb-4">Recent Attendance</h3>
-          <div className="space-y-3">
-            {attendanceData.slice(0, 4).map((attendance, index) => (
-              <div key={index} className="flex items-center justify-between p-3 bg-white/5 backdrop-blur-sm border border-white/10 rounded-lg shadow-sm">
-                <div>
-                  <p className="text-sm font-medium text-white">
-                    {new Date(attendance.date).toLocaleDateString('en-US', { 
-                      weekday: 'long',
-                      month: 'short', 
-                      day: 'numeric' 
-                    })}
-                  </p>
-                </div>
-                <div className="text-right">
-                  <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${
-                    attendance.status === 'present' 
-                      ? 'bg-green-500/20 text-green-300' 
-                      : attendance.status === 'late'
-                      ? 'bg-yellow-500/20 text-yellow-300'
-                      : 'bg-red-500/20 text-red-300'
-                  }`}>
-                    {attendance.status}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-          <button className="w-full mt-4 text-sm text-gray-200 hover:text-white font-medium transition-colors">
-            View full attendance
-          </button>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Fee Details */}
-        <div className="card-glassmorphism">
-          <h3 className="text-lg font-semibold text-white mb-4">Fee Details</h3>
-          <div className="space-y-3">
-            {feeDetails.map((fee) => (
-              <div key={fee.id} className="flex items-center justify-between p-3 bg-white/5 backdrop-blur-sm border border-white/10 rounded-lg shadow-sm">
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-white">{fee.type}</p>
-                  <p className="text-xs text-gray-200">Due: {new Date(fee.dueDate).toLocaleDateString()}</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm font-bold text-white">${fee.amount}</p>
-                  <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${
-                    fee.status === 'paid' 
-                      ? 'bg-green-500/20 text-green-300' 
-                      : 'bg-yellow-500/20 text-yellow-300'
-                  }`}>
-                    {fee.status}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-          <button className="w-full mt-4 text-sm text-gray-200 hover:text-white font-medium transition-colors">
-            View all fees
-          </button>
-        </div>
-
-        {/* Upcoming Events */}
-        <div className="card-glassmorphism">
-          <h3 className="text-lg font-semibold text-white mb-4">Upcoming Events</h3>
-          <div className="space-y-3">
-            {upcomingEvents.map((event) => (
-              <div key={event.id} className="flex items-center justify-between p-3 bg-white/5 backdrop-blur-sm border border-white/10 rounded-lg shadow-sm">
-                <div>
-                  <p className="text-sm font-medium text-white">{event.title}</p>
-                  <p className="text-xs text-gray-200 capitalize">{event.type} • {event.time}</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-xs text-gray-200">
-                    {new Date(event.date).toLocaleDateString('en-US', { 
-                      month: 'short', 
-                      day: 'numeric' 
-                    })}
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
+              <span className="text-white/80 capitalize">{entry.status}</span>
+            </div>
+          )) : <p className="text-white/70">No fee payments available.</p>}
         </div>
       </div>
     </div>

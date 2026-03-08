@@ -4,18 +4,20 @@ export type UserRole = 'admin' | 'teacher' | 'student' | 'parent' | 'accountant'
 // User interface
 export interface User {
   id: string;
+  name: string;
   email: string;
-  firstName: string;
-  lastName: string;
   role: UserRole;
-  avatar?: string;
+  profilePicture?: string;
   phone?: string;
-  address?: string;
-  dateOfBirth?: string;
   schoolId: string;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+  profileId?: string | null;
+  classId?: string | null;
+  parentId?: string | null;
+  classIds?: string[];
+  childIds?: string[];
 }
 
 // School interface
@@ -156,6 +158,18 @@ export interface Notice {
   isActive: boolean;
 }
 
+export interface Notification {
+  id?: string;
+  _id?: string;
+  title: string;
+  message: string;
+  type: 'notice' | 'system' | 'payment' | 'report';
+  isRead: boolean;
+  relatedNotice?: string | null;
+  createdAt: string;
+  updatedAt?: string;
+}
+
 // Timetable interface
 export interface TimetableSlot {
   id: string;
@@ -205,12 +219,14 @@ export interface ApiResponse<T> {
   data: T;
   message?: string;
   error?: string;
+  errors?: unknown;
 }
 
 // Form types
 export interface LoginForm {
   email: string;
   password: string;
+  schoolId?: string;
 }
 
 export interface SchoolSignupForm {
@@ -227,8 +243,7 @@ export interface SchoolSignupForm {
 }
 
 export interface StudentForm {
-  firstName: string;
-  lastName: string;
+  name: string;
   email: string;
   phone?: string;
   dateOfBirth: string;
@@ -245,8 +260,7 @@ export interface StudentForm {
 }
 
 export interface TeacherForm {
-  firstName: string;
-  lastName: string;
+  name: string;
   email: string;
   phone?: string;
   dateOfBirth: string;

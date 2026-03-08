@@ -7,6 +7,7 @@ import {
   Calendar, 
   ClipboardCheck, 
   BookOpen, 
+  FileCheck,
   DollarSign, 
   FileText, 
   BarChart3, 
@@ -60,19 +61,25 @@ const menuItems: MenuItem[] = [
     icon: <ClipboardCheck size={20} />,
     label: 'Attendance',
     path: '/attendance',
+    roles: ['admin', 'teacher']
+  },
+  {
+    icon: <FileCheck size={20} />,
+    label: 'Exams',
+    path: '/exams',
     roles: ['admin', 'teacher', 'student', 'parent']
   },
   {
     icon: <BookOpen size={20} />,
     label: 'Grades',
     path: '/grades',
-    roles: ['admin', 'teacher', 'student', 'parent']
+    roles: ['admin', 'teacher']
   },
   {
     icon: <DollarSign size={20} />,
     label: 'Fees',
     path: '/fees',
-    roles: ['admin', 'accountant', 'parent']
+    roles: ['admin', 'accountant']
   },
   {
     icon: <FileText size={20} />,
@@ -146,13 +153,13 @@ const Sidebar: React.FC = () => {
       <div className="p-4 border-t border-white/10 flex-shrink-0">
         <div className="flex items-center space-x-3 mb-4">
           <img
-            src={user?.avatar || 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150'}
-            alt={`${user?.firstName} ${user?.lastName}`}
+            src={user?.profilePicture || 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150'}
+            alt={user?.name || 'User avatar'}
             className="w-10 h-10 rounded-full object-cover"
           />
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-white truncate">
-              {user?.firstName} {user?.lastName}
+              {user?.name}
             </p>
             <p className="text-xs text-white/60 capitalize">{user?.role}</p>
           </div>
